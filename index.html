@@ -47,6 +47,19 @@
             background-color: #ccc;
             cursor: not-allowed;
         }
+        #command-container {
+            margin-top: 2rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        #command-input {
+            padding: 0.5rem;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -60,11 +73,16 @@
             <h2>Live Data:</h2>
             <div id="data"></div>
         </div>
+        <div id="command-container" hidden>
+            <input type="text" id="command-input" placeholder="Enter command" />
+            <button id="send-btn">Send Command</button>
+        </div>
     </main>
 
     <script>
         let port = null;
         let reader = null;
+        let writer = null;
 
         async function connectToMicrobit() {
             try {
@@ -76,8 +94,13 @@
                 const inputDone = port.readable.pipeTo(decoder.writable);
                 reader = decoder.readable.getReader();
 
+                const encoder = new TextEncoderStream();
+                const outputDone = encoder.readable.pipeTo(port.writable);
+                writer = encoder.writable.getWriter();
+
                 document.getElementById('connect-btn').disabled = true;
                 document.getElementById('data-container').hidden = false;
+                document.getElementById('command-container').hidden = false;
 
                 readData();
             } catch (error) {
@@ -109,7 +132,17 @@
             }
         }
 
+        async function sendCommand() {
+            const input = document.getElementById('command-input');
+            const command = input.value;
+            if (writer && command) {
+                await writer.write(command + '\n'); // Send the command with a newline
+                input.value = ""; // Clear the input field
+            }
+        }
+
         document.getElementById('connect-btn').addEventListener('click', connectToMicrobit);
+        document.getElementById('send-btn').addEventListener('click', sendCommand);
     </script>
 </body>
 </html>
