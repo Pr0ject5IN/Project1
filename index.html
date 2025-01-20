@@ -54,7 +54,7 @@
         <h1>Micro:bit Real-Time Dashboard</h1>
     </header>
     <main>
-        <p>Connect your Micro:bit to see live data updates in real-time.</p>
+        <p>Connect your Micro:bit via USB to see live data updates in real-time.</p>
         <button id="connect-btn">Connect Micro:bit</button>
         <div id="data-container" hidden>
             <h2>Live Data:</h2>
@@ -63,43 +63,49 @@
     </main>
 
     <script>
-        let device = null;
-        let characteristic = null;
+        let port = null;
+        let reader = null;
 
         async function connectToMicrobit() {
             try {
-                const options = {
-                    acceptAllDevices: true,
-                    optionalServices: ['device_information', 'e95d93ee-251d-470a-a062-fa1922dfa9a8']
-                };
-                device = await navigator.bluetooth.requestDevice(options);
-                const server = await device.gatt.connect();
+                // Request a port and open a connection
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
 
-                const service = await server.getPrimaryService('e95d93ee-251d-470a-a062-fa1922dfa9a8');
-                characteristic = await service.getCharacteristic('e95d9250-251d-470a-a062-fa1922dfa9a8');
-
-                characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleData);
+                const decoder = new TextDecoderStream();
+                const inputDone = port.readable.pipeTo(decoder.writable);
+                reader = decoder.readable.getReader();
 
                 document.getElementById('connect-btn').disabled = true;
                 document.getElementById('data-container').hidden = false;
+
+                readData();
             } catch (error) {
                 console.error('Connection failed:', error);
                 alert('Could not connect to Micro:bit. Please try again.');
             }
         }
 
-        function handleData(event) {
-            const value = new TextDecoder().decode(event.target.value);
+        async function readData() {
             const dataDiv = document.getElementById('data');
 
-            const item = document.createElement('div');
-            item.classList.add('data-item');
-            item.textContent = `Data: ${value}`;
-            dataDiv.appendChild(item);
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        break;
+                    }
+                    const item = document.createElement('div');
+                    item.classList.add('data-item');
+                    item.textContent = `Data: ${value.trim()}`;
+                    dataDiv.appendChild(item);
 
-            if (dataDiv.children.length > 10) {
-                dataDiv.removeChild(dataDiv.firstChild);
+                    if (dataDiv.children.length > 10) {
+                        dataDiv.removeChild(dataDiv.firstChild);
+                    }
+                }
+            } catch (error) {
+                console.error('Error reading data:', error);
             }
         }
 
