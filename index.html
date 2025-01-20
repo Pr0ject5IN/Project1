@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micro:bit Real-Time Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        header {
+            background-color: #0078D7;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        main {
+            padding: 2rem;
+            text-align: center;
+        }
+        #data-container {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            text-align: left;
+        }
+        .data-item {
+            margin-bottom: 1rem;
+        }
+        button {
+            background-color: #0078D7;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Micro:bit Real-Time Dashboard</h1>
+    </header>
+    <main>
+        <p>Connect your Micro:bit to see live data updates in real-time.</p>
+        <button id="connect-btn">Connect Micro:bit</button>
+        <div id="data-container" hidden>
+            <h2>Live Data:</h2>
+            <div id="data"></div>
+        </div>
+    </main>
+
+    <script>
+        let device = null;
+        let characteristic = null;
+
+        async function connectToMicrobit() {
+            try {
+                const options = {
+                    acceptAllDevices: true,
+                    optionalServices: ['device_information', 'e95d93ee-251d-470a-a062-fa1922dfa9a8']
+                };
+                device = await navigator.bluetooth.requestDevice(options);
+                const server = await device.gatt.connect();
+
+                const service = await server.getPrimaryService('e95d93ee-251d-470a-a062-fa1922dfa9a8');
+                characteristic = await service.getCharacteristic('e95d9250-251d-470a-a062-fa1922dfa9a8');
+
+                characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleData);
+
+                document.getElementById('connect-btn').disabled = true;
+                document.getElementById('data-container').hidden = false;
+            } catch (error) {
+                console.error('Connection failed:', error);
+                alert('Could not connect to Micro:bit. Please try again.');
+            }
+        }
+
+        function handleData(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            const dataDiv = document.getElementById('data');
+
+            const item = document.createElement('div');
+            item.classList.add('data-item');
+            item.textContent = `Data: ${value}`;
+            dataDiv.appendChild(item);
+
+            if (dataDiv.children.length > 10) {
+                dataDiv.removeChild(dataDiv.firstChild);
+            }
+        }
+
+        document.getElementById('connect-btn').addEventListener('click', connectToMicrobit);
+    </script>
+</body>
+</html>
